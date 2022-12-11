@@ -44,4 +44,4 @@ const port = process.env.PORT || 8000
 server.listen(8000, () => console.log(`server is running on port ${port}`));
 
 // Export the Express API
-module.exports = app;
+module.exports = server;
