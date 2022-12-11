@@ -7,6 +7,12 @@ const io = socket(server);
 
 const rooms = {};
 
+// Create GET request
+app.get("/", (req, res) => {
+    res.send("Express on Vercel");
+});
+
+
 io.on("connection", socket => {
     socket.on("join room", (userJoin, roomCode) => {
         if (!rooms[roomCode]) rooms[roomCode] = [];
@@ -36,3 +42,6 @@ io.on("connection", socket => {
 
 const port = process.env.PORT || 8000
 server.listen(8000, () => console.log(`server is running on port ${port}`));
+
+// Export the Express API
+module.exports = app;
