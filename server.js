@@ -9,17 +9,15 @@ const rooms = {};
 
 io.on("connection", socket => {
     socket.on("join room", (userJoin, roomCode) => {
-
-        console.log(newSocket)
-        console.log(rooms)
         if (!rooms[roomCode]) rooms[roomCode] = [];
         if (rooms[roomCode].find(user => user.id === userJoin.id)) return;
 
-        rooms[roomCode].push(userJoin);
+        rooms[roomCode].push({ ...userJoin, socketId: socket.id });
         const otherUser = rooms[roomCode].find(user => user.id !== userJoin.id);
+
         if (otherUser) {
-            socket.emit("other user", otherUser);
-            socket.to(otherUser).emit("user joined", socket.id);
+            socket.emit("user call", otherUser.socketId);
+            socket.to(otherUser.socketId).emit("user joined", socket.id);
         }
     });
 
