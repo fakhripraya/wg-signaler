@@ -1,0 +1,26 @@
+{
+  "name": "wg-signaler",
+  "version": "0.1.0",
+  "description": "Signaler service for WG client",
+  "main": "server.js",
+  "dependencies": {
+    "express": "^4.18.2",
+    "nodemon": "^2.0.20",
+    "socket.io": "^2.5.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fakhripraya/wg-signaler.git"
+  },
+  "author": "fakhripraya",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/fakhripraya/wg-signaler/issues"
+  },
+  "homepage": "https://github.com/fakhripraya/wg-signaler#readme"
+}
