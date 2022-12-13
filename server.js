@@ -1,3 +1,4 @@
+const { ROOM_FULL, ROOM_AVAILABLE, USER_ALREADY_JOIN } = require("./variables/global");
 const express = require("express");
 const http = require("http");
 const cors = require("cors");
@@ -23,7 +24,7 @@ io.on("connection", (socket) => {
 
         if (!io.custom.rooms[roomCode]) io.custom.rooms[roomCode] = [];
         if (io.custom.rooms[roomCode].find((user) => user.id === userJoin.id)) return;
-        if (io.custom.rooms[roomCode].length >= 2) return;
+        if (io.custom.rooms[roomCode].length >= 2) socket.emit("rdp error", ROOM_FULL);
 
         socket.joined_room = roomCode;
         io.custom.rooms[roomCode].push({ ...userJoin, socketId: socket.id });
@@ -59,6 +60,33 @@ io.on("connection", (socket) => {
         if (socketIndex > -1) io.custom.rooms[socket.joined_room].splice(socketIndex, 1);
     });
 });
+
+// GET method route
+app.get('/v1/room/check', (req, res) => {
+    // Retrieve the tag from our URL path
+    const query = {
+        user: {
+            id: req.query.userId,
+        },
+        roomCode: req.query.roomCode
+    };
+
+    if (!io.custom.rooms[query.roomCode]) return res.send(JSON.stringify({
+        code: ROOM_AVAILABLE
+    })).status(200);
+
+    if (io.custom.rooms[query.roomCode].find((user) => user.id === query.user.id)) return res.send(JSON.stringify({
+        code: USER_ALREADY_JOIN
+    })).status(403);
+
+    if (io.custom.rooms[query.roomCode].length >= 2) return res.send(JSON.stringify({
+        code: ROOM_FULL
+    })).status(403);
+
+    return res.send(JSON.stringify({
+        code: ROOM_AVAILABLE
+    })).status(200);
+})
 
 const port = process.env.PORT || 8000;
 server.listen(8000, () => console.log(`server is running on port ${port}`));
