@@ -14,17 +14,21 @@ const io = socket(server, {
 });
 
 app.use(cors());
-const rooms = {};
 
 io.on("connection", (socket) => {
+    if (!io.custom) io.custom = {};
+    if (!io.custom.rooms) io.custom.rooms = [];
+
     socket.on("join room", (userJoin, roomCode) => {
-        console.log("user join nih: " + userJoin.id);
-        if (!rooms[roomCode]) rooms[roomCode] = [];
-        if (rooms[roomCode].find((user) => user.id === userJoin.id)) return;
 
-        rooms[roomCode].push({ ...userJoin, socketId: socket.id });
-        const otherUser = rooms[roomCode].find((user) => user.id !== userJoin.id);
+        if (!io.custom.rooms[roomCode]) io.custom.rooms[roomCode] = [];
+        if (io.custom.rooms[roomCode].find((user) => user.id === userJoin.id)) return;
+        if (io.custom.rooms[roomCode].length >= 2) return;
 
+        socket.joined_room = roomCode;
+        io.custom.rooms[roomCode].push({ ...userJoin, socketId: socket.id });
+
+        const otherUser = io.custom.rooms[roomCode].find((user) => user.id !== userJoin.id);
         if (otherUser) {
             socket.emit("user call", otherUser.socketId);
             socket.to(otherUser.socketId).emit("user joined", socket.id);
@@ -41,6 +45,18 @@ io.on("connection", (socket) => {
 
     socket.on("ice-candidate", (incoming) => {
         io.to(incoming.target).emit("ice-candidate", incoming.candidate);
+    });
+
+    socket.on("disconnecting", () => {
+        if (!io.custom) return;
+        if (!io.custom.rooms) return;
+        if (!io.custom.rooms[socket.joined_room]) return;
+
+        const userSocket = io.custom.rooms[socket.joined_room].find((user) => user.socketId === socket.id);
+        if (!userSocket) return;
+
+        const socketIndex = io.custom.rooms[socket.joined_room].indexOf(userSocket);
+        if (socketIndex > -1) io.custom.rooms[socket.joined_room].splice(socketIndex, 1);
     });
 });
 
