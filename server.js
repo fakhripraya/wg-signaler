@@ -26,6 +26,7 @@ const rooms = [];
 
 io.on("connection", (socket) => {
     socket.on("join room", (userJoin, roomCode) => {
+
         if (rooms[roomCode].users.find((user) => user.id === userJoin.id)) return;
         if (rooms[roomCode].users.length >= 2) socket.emit("rdp error", ROOM_FULL);
 
