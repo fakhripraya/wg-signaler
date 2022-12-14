@@ -1,10 +1,11 @@
-const { ROOM_FULL, ROOM_AVAILABLE, USER_ALREADY_JOIN } = require("./variables/global");
+const { ROOM_FULL, ROOM_AVAILABLE, USER_ALREADY_JOIN, ROOM_UNAVAILABLE } = require("./variables/global");
 const express = require("express");
 const http = require("http");
 const cors = require("cors");
 const app = express();
 const server = http.createServer(app);
 const socket = require("socket.io");
+const { randomUUID } = require("crypto");
 const io = socket(server, {
     cors: {
         origin: "*",
@@ -14,22 +15,20 @@ const io = socket(server, {
     },
 });
 
+app.use(express.json());
 app.use(cors());
+const rooms = [];
 
 io.on("connection", (socket) => {
-    if (!io.custom) io.custom = {};
-    if (!io.custom.rooms) io.custom.rooms = [];
-
     socket.on("join room", (userJoin, roomCode) => {
 
-        if (!io.custom.rooms[roomCode]) io.custom.rooms[roomCode] = [];
-        if (io.custom.rooms[roomCode].find((user) => user.id === userJoin.id)) return;
-        if (io.custom.rooms[roomCode].length >= 2) socket.emit("rdp error", ROOM_FULL);
+        if (rooms[roomCode].users.find((user) => user.id === userJoin.id)) return;
+        if (rooms[roomCode].users.length >= 2) socket.emit("rdp error", ROOM_FULL);
 
-        socket.joined_room = roomCode;
-        io.custom.rooms[roomCode].push({ ...userJoin, socketId: socket.id });
+        socket.joinedRoom = roomCode;
+        rooms[roomCode].users.push({ ...userJoin, socketId: socket.id });
 
-        const otherUser = io.custom.rooms[roomCode].find((user) => user.id !== userJoin.id);
+        const otherUser = rooms[roomCode].users.find((user) => user.id !== userJoin.id);
         if (otherUser) {
             socket.emit("user call", otherUser.socketId);
             socket.to(otherUser.socketId).emit("user joined", socket.id);
@@ -49,20 +48,22 @@ io.on("connection", (socket) => {
     });
 
     socket.on("disconnecting", () => {
-        if (!io.custom) return;
-        if (!io.custom.rooms) return;
-        if (!io.custom.rooms[socket.joined_room]) return;
+        if (!rooms[socket.joinedRoom]) return;
 
-        const userSocket = io.custom.rooms[socket.joined_room].find((user) => user.socketId === socket.id);
+        const userSocket = rooms[socket.joinedRoom].users.find((user) => user.socketId === socket.id);
         if (!userSocket) return;
 
-        const socketIndex = io.custom.rooms[socket.joined_room].indexOf(userSocket);
-        if (socketIndex > -1) io.custom.rooms[socket.joined_room].splice(socketIndex, 1);
+        const socketIndex = rooms[socket.joinedRoom].users.indexOf(userSocket);
+        if (socketIndex > -1) rooms[socket.joinedRoom].users.splice(socketIndex, 1);
     });
 });
 
 // GET method route
 app.get('/v1/room/check', (req, res) => {
+
+    // check query param availability
+    if (!req.query) return res.sendStatus(400);
+
     // Retrieve the tag from our URL path
     const query = {
         user: {
@@ -71,20 +72,43 @@ app.get('/v1/room/check', (req, res) => {
         roomCode: req.query.roomCode
     };
 
-    if (!io.custom.rooms[query.roomCode]) return res.send(JSON.stringify({
-        code: ROOM_AVAILABLE
+    if (!rooms[query.roomCode]) return res.send(JSON.stringify({
+        code: ROOM_UNAVAILABLE
     })).status(200);
 
-    if (io.custom.rooms[query.roomCode].find((user) => user.id === query.user.id)) return res.send(JSON.stringify({
+    if (rooms[query.roomCode].users.find((user) => user.id === query.user.id)) return res.send(JSON.stringify({
         code: USER_ALREADY_JOIN
     })).status(403);
 
-    if (io.custom.rooms[query.roomCode].length >= 2) return res.send(JSON.stringify({
+    if (rooms[query.roomCode].users.length >= 2) return res.send(JSON.stringify({
         code: ROOM_FULL
     })).status(403);
 
     return res.send(JSON.stringify({
         code: ROOM_AVAILABLE
+    })).status(200);
+})
+
+// POST method route
+app.post('/v1/room/create', (req, res) => {
+
+    // check request body availability
+    if (!req.body) return res.sendStatus(400);
+
+    // Retrieve the request body
+    const user = req.body.user;
+
+    // create random crypted uuid
+    const roomCode = randomUUID();
+
+    rooms[roomCode] = {
+        users: [],
+        created_at: new Date(),
+        created_by: user.id
+    };
+
+    return res.send(JSON.stringify({
+        roomCode: roomCode
     })).status(200);
 })
 
