@@ -194,9 +194,13 @@ const initializeSignaler = (io) => {
             // let all consumers to consume this producer
             console.log(`SOCKET ${socket.id} - just joined, with PRODUCER ID ${producerId} and ROOM ID ${roomId}`);
             const peers = getAllPeers(roomId);
-            for (const peer of peers) {
-                if (peer.userId !== userId) {
-                    const producerSocket = peer.socket;
+            console.log(`SOCKET ${socket.id} - broadcaster peer USER ID: ${userId}`);
+            console.log(peers);
+            for (const [key, value] of Object.entries(peers)) {
+                console.log(`SOCKET ${socket.id} - current looped peer USER ID: ${key}`);
+                console.log(value)
+                if (key !== userId) {
+                    const producerSocket = value.socket;
                     // use socket to send producer id to producer
                     producerSocket.emit('new-producer', { producerId: producerId });
                 }
@@ -209,11 +213,11 @@ const initializeSignaler = (io) => {
             socketId: socket.id,
         })
 
-        socket.on('joinRoom', async (joinDetails, callback) => {
+        socket.on('join-room', async (joinDetails, callback) => {
             // create Router if it does not exist
             // const router1 = rooms[roomName] && rooms[roomName].get('data').router || await createRoom(roomName, socket.id)
             const { router, error } = await createOrJoinRoom(joinDetails, socket);
-            if (error) return socket.emit('userAlreadyJoined', { error: error });
+            if (error) return socket.emit('user-already-joined', { error: error });
 
             // get Router RTP Capabilities
             const rtpCapabilities = router.rtpCapabilities;
@@ -224,7 +228,7 @@ const initializeSignaler = (io) => {
 
         // Client emits a request to create server side Transport
         // We need to differentiate between the producer and consumer transports
-        socket.on('createWebRtcTransport', async ({ isConsumer, room, user }, callback) => {
+        socket.on('create-webrtc-transport', async ({ isConsumer, room, user }, callback) => {
             // get Router (Room) object this peer is in based on RoomName
             const router = rooms[room.roomId].router;
             createWebRtcTransport(router)
@@ -293,12 +297,11 @@ const initializeSignaler = (io) => {
             });
         })
 
-        socket.on('getProducers', ({ room }, callback) => {
+        socket.on('get-producers', ({ room }, callback) => {
             // get all peers in the room
             // and return all producer transports
             let peers = getAllPeers(room.roomId);
             let producerList = [];
-            console.log('looping')
             for (const [key, value] of Object.entries(peers)) {
                 console.log(key)
                 value.producers.forEach(producer => {
@@ -411,10 +414,18 @@ const initializeSignaler = (io) => {
             if (!peers[disconnectingPeer.userId]) return;
 
             // remove socket from room
+            console.log(`SOCKET ${socket.id} - before room filtered`);
+            console.log(peers);
+            const filteredPeers = Object.fromEntries(Object.entries(rooms[disconnectingPeer.roomId].peers).filter(([key]) => {
+                return key !== disconnectingPeer.userId
+            }));
+            console.log(`SOCKET ${socket.id} - after room filtered`);
+            console.log(filteredPeers);
             rooms[disconnectingPeer.roomId] = {
                 router: rooms[disconnectingPeer.roomId].router,
-                peers: rooms[disconnectingPeer.roomId].peers.filter(peer => peer.userId !== disconnectingPeer.userId)
+                peers: filteredPeers
             }
+            delete globalPeers[socket.id];
         })
     })
 }
