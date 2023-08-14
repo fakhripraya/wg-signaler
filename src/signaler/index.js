@@ -287,7 +287,6 @@ const initializeSignaler = (io) => {
             // Send back to the client the Producer's id
             const peers = getAllPeers(room.roomId);
             console.log(rooms);
-            console.log(Object.keys(peers).length)
             callback({
                 producerId: producer.id,
                 peersExist: Object.keys(peers).length > 1 ? true : false
