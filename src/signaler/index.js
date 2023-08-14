@@ -403,9 +403,9 @@ const initializeSignaler = (io) => {
             // do some cleanup
             // return if the socket does not exist in the room
             const disconnectingPeer = globalPeers[socket.id];
-            console.log(`SOCKET ${socket.id} - peer disconnected with 
-            USER ID ${disconnectingPeer.userId},
-            from the ROOM ID: ${disconnectingPeer.roomId}`);
+            if (!disconnectingPeer) return;
+
+            console.log(`SOCKET ${socket.id} - peer disconnected with USER ID ${disconnectingPeer.userId}, from the ROOM ID: ${disconnectingPeer.roomId}`);
             if (!rooms[disconnectingPeer.roomId]) return;
             let peers = getAllPeers(disconnectingPeer.roomId);
             if (!peers[disconnectingPeer.userId]) return;
