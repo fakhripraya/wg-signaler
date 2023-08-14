@@ -1,20 +1,19 @@
-import InitWebsocket from "./src/config/websocket";
-import dotenv from 'dotenv';
 import express from 'express';
-import defaultRoute from "./src/routes/default";
-import voipRoute from "./src/routes/voip";
-import voipRoute from "./src/signaler";
-import AppConfig from './src/config';
-import initializeSignaler from "./src/signaler";
+import InitWebsocket from "./src/config/websocket.js";
+import dotenv from 'dotenv';
+import defaultRoute from "./src/routes/default.js";
+import voipRoute from "./src/routes/voip.js";
+import AppConfig from './src/config/index.js';
+import initializeSignaler from './src/signaler/index.js';
 
 // Init env
 dotenv.config();
 
 // Initialize express app object
-var app = express();
+var expressApp = express();
 
 // Init App configurations
-const { server, app } = AppConfig(app, express);
+const { server, app } = AppConfig(expressApp, express);
 
 // websocket initialization
 const io = InitWebsocket(server);

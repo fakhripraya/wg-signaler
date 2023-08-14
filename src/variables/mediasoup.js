@@ -18,3 +18,16 @@ export const mediaCodecs = [
         },
     },
 ]
+
+// https://mediasoup.org/documentation/v3/mediasoup/api/#WebRtcTransportOptions
+export const webRtcTransport_options = {
+    listenIps: [
+        {
+            ip: '0.0.0.0',
+            announcedIp: '127.0.0.1'
+        }
+    ],
+    enableUdp: true,
+    enableTcp: true,
+    preferUdp: true,
+}

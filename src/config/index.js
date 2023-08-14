@@ -1,15 +1,16 @@
 import cors from 'cors';
-import { CORSConfiguration } from "./connection";
+import CORSConfiguration from "./connection.js";
 import cookieParser from 'cookie-parser';
 import logger from 'morgan';
 import https from 'httpolyglot'
 import http from "http";
-import { DEV } from '../variables/general';
+import { DEV } from '../variables/general.js';
 import fs from 'fs';
+import pluralize from 'pluralize';
 
 const AppConfig = (app, express) => {
     // Express app config
-    app.locals.pluralize = require('pluralize');
+    app.locals.pluralize = pluralize;
     app.use(logger('dev'));
     app.use(express.json());
     app.use(express.urlencoded({ extended: false }));
@@ -32,11 +33,11 @@ const AppConfig = (app, express) => {
     // Initialize HTTP/HTTPS server
     // SSL cert for HTTPS access 
     // (this is for test purposes and will not be used on production app)
+    let server = http.createServer(app);
     const options = {
         key: fs.readFileSync('./ssl/key.pem', 'utf-8'),
         cert: fs.readFileSync('./ssl/cert.pem', 'utf-8')
     }
-    const server = http.createServer(app);
     if (process.env.APP_STATE === DEV) server = https.createServer(options, app);
     return { server, app };
 }
