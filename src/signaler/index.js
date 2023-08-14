@@ -213,7 +213,6 @@ const initializeSignaler = (io) => {
             // create Router if it does not exist
             // const router1 = rooms[roomName] && rooms[roomName].get('data').router || await createRoom(roomName, socket.id)
             const { router, error } = await createOrJoinRoom(joinDetails, socket);
-            console.log(error)
             if (error) return socket.emit('userAlreadyJoined', { error: error });
 
             // get Router RTP Capabilities
@@ -287,9 +286,11 @@ const initializeSignaler = (io) => {
 
             // Send back to the client the Producer's id
             const peers = getAllPeers(room.roomId);
+            console.log(rooms);
+            console.log(Object.keys(peers).length)
             callback({
                 producerId: producer.id,
-                peersExist: Object.keys(peers).length > 0 ? true : false
+                peersExist: Object.keys(peers).length > 1 ? true : false
             });
         })
 
