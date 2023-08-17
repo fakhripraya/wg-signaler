@@ -17,10 +17,12 @@ const initializeSignaler = (io) => {
 
     // FUNCTION SPECIFIC //
     const createWorker = async () => {
+        // USE PM2 TO CREATE CLUSTERING NODE JS PROCESS
+        // SO WHEN THE MAX PORT REACH THERE IS STILL MORE WORKER THAT CAN PROCESS 
         // Create worker to handle the webRTC background process
         worker = await mediasoup.createWorker({
-            rtcMinPort: 2000,
-            rtcMaxPort: 2020,
+            rtcMinPort: process.env.APP_RTC_MIN_PORT,
+            rtcMaxPort: process.env.APP_RTC_MAX_PORT,
         })
         console.log(`created WORKER with pid ${worker.pid}`)
 
@@ -62,7 +64,7 @@ const initializeSignaler = (io) => {
                 }
             };
 
-            if (rooms[room.roomId]) {
+            if (rooms[room.roomId] && rooms[room.roomId].router) {
                 router = rooms[room.roomId].router;
                 peers = rooms[room.roomId].peers || [];
                 console.log(`SOCKET ${socket.id} - ROOM ID : ${room.roomId} exist, with ROUTER ID: ${router.id}`);
@@ -195,7 +197,6 @@ const initializeSignaler = (io) => {
             console.log(`SOCKET ${socket.id} - just joined, with PRODUCER ID ${producerId} and ROOM ID ${roomId}`);
             const peers = getAllPeers(roomId);
             console.log(`SOCKET ${socket.id} - broadcaster peer USER ID: ${userId}`);
-            console.log(peers);
             for (const [key, value] of Object.entries(peers)) {
                 console.log(`SOCKET ${socket.id} - current looped peer USER ID: ${key}`);
                 console.log(value)
@@ -217,7 +218,7 @@ const initializeSignaler = (io) => {
             // create Router if it does not exist
             // const router1 = rooms[roomName] && rooms[roomName].get('data').router || await createRoom(roomName, socket.id)
             const { router, error } = await createOrJoinRoom(joinDetails, socket);
-            if (error) return socket.emit('user-already-joined', { error: error });
+            if (error) return socket.emit('user-already-joined');
 
             // get Router RTP Capabilities
             const rtpCapabilities = router.rtpCapabilities;
@@ -250,6 +251,11 @@ const initializeSignaler = (io) => {
                     });
                 }).catch((error) => {
                     console.log(`SOCKET ${socket.id} - error creating WebRtcTransport for ${isConsumer ? 'consumer' : 'producer'}: ${error}`);
+                    callback({
+                        params: {
+                            error: `${error}`,
+                        }
+                    });
                 });
         })
 
@@ -414,17 +420,22 @@ const initializeSignaler = (io) => {
             if (!peers[disconnectingPeer.userId]) return;
 
             // remove socket from room
-            console.log(`SOCKET ${socket.id} - before room filtered`);
-            console.log(peers);
             const filteredPeers = Object.fromEntries(Object.entries(rooms[disconnectingPeer.roomId].peers).filter(([key]) => {
                 return key !== disconnectingPeer.userId
             }));
-            console.log(`SOCKET ${socket.id} - after room filtered`);
-            console.log(filteredPeers);
+
+            // cleanup the router if room not used
+            if (Object.entries(filteredPeers).length === 0) {
+                rooms[disconnectingPeer.roomId].router.close();
+                delete rooms[disconnectingPeer.roomId].router;
+            }
+            // update room value
             rooms[disconnectingPeer.roomId] = {
-                router: rooms[disconnectingPeer.roomId].router,
+                ...rooms[disconnectingPeer.roomId],
                 peers: filteredPeers
             }
+
+            console.log(rooms[disconnectingPeer.roomId]);
             delete globalPeers[socket.id];
         })
     })
