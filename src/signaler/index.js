@@ -73,9 +73,18 @@ const initializeSignaler = (io) => {
                 console.log(`SOCKET ${socket.id} - created ROUTER with ID: ${router.id}`, peers.length);
             }
 
+            // declare error here
+            const error = {
+                router: null,
+                error: `SOCKET ${socket.id} - error joining room: ${USER_ALREADY_JOIN}`
+            };
             // peer used user id to uniquely identified the peer by user reference
             // it is to prevent double join on different device
-            // TODO: test double join on different device
+            // check double join on different device
+            for (const [key, value] of Object.entries(globalPeers)) {
+                if (value.userId === user.userId)
+                    return error;
+            }
             if (!(user.userId in peers)) {
                 peers[user.userId] = peer;
                 globalPeers[socket.id] = {
@@ -85,7 +94,7 @@ const initializeSignaler = (io) => {
                     storeId: storeId
                 }
             }
-            else return { router: null, error: `SOCKET ${socket.id} - error joining room: ${USER_ALREADY_JOIN}` };
+            else return error;
             console.log(`SOCKET ${socket.id} - user joined the room with user Id: ${user.userId}`);
 
             // Room info that hold the information of the current room the peer want to join 
@@ -109,12 +118,12 @@ const initializeSignaler = (io) => {
                     // create the event listener for the transport
                     transport.on('dtlsstatechange', dtlsState => {
                         console.log(`SOCKET ${socket.id} - DTLS STATE: ${dtlsState}`);
-                        if (dtlsState === 'closed') transport.close()
+                        if (dtlsState === 'closed') transport.close();
                     });
-                    transport.on('close', () => console.log(`SOCKET ${socket.id} - ${transport.id}- TRANSPORT closed`));
+
+                    // on router close event
                     transport.on('routerclose', () => {
                         console.log(`SOCKET ${socket.id} - ${transport.id} TRANSPORT closed because of router closed`);
-                        transport.close();
                     });
 
                     resolve(transport);
@@ -198,8 +207,6 @@ const initializeSignaler = (io) => {
             const peers = getAllPeers(roomId);
             console.log(`SOCKET ${socket.id} - broadcaster peer USER ID: ${userId}`);
             for (const [key, value] of Object.entries(peers)) {
-                console.log(`SOCKET ${socket.id} - current looped peer USER ID: ${key}`);
-                console.log(value)
                 if (key !== userId) {
                     const producerSocket = value.socket;
                     // use socket to send producer id to producer
@@ -291,7 +298,6 @@ const initializeSignaler = (io) => {
 
             producer.on('transportclose', () => {
                 console.log(`SOCKET ${socket.id} - transport for this producer closed, PRODUCER ID: ${producer.id}`);
-                producer.close();
             })
 
             // Send back to the client the Producer's id
@@ -303,13 +309,16 @@ const initializeSignaler = (io) => {
             });
         })
 
-        socket.on('get-producers', ({ room }, callback) => {
+        socket.on('get-producers', ({ user, room }, callback) => {
             // get all peers in the room
             // and return all producer transports
             let peers = getAllPeers(room.roomId);
             let producerList = [];
+            console.log(`SOCKET ${socket.id} - user with ID ${user.userId} requesting remote producers inside the room`);
             for (const [key, value] of Object.entries(peers)) {
-                console.log(key)
+                if (key === user.userId) continue;
+                console.log(`LOOPED USER: ${key}`);
+                console.log("LOOPING THROUGH KEY PRODUCERS...");
                 value.producers.forEach(producer => {
                     console.log(producer)
                     producerList = [...producerList, producer.id];
@@ -358,7 +367,7 @@ const initializeSignaler = (io) => {
                     })
 
                     consumer.on('transportclose', () => {
-                        console.log(`SOCKET ${socket.id} - TRANSPORT close from consumer  with TRANSPORT ID ${serverConsumerTransportId} and USER ID ${user.userId}`);
+                        console.log(`SOCKET ${socket.id} - TRANSPORT close from consumer with TRANSPORT ID ${serverConsumerTransportId} and USER ID ${user.userId}`);
                     })
 
                     consumer.on('producerclose', () => {
@@ -427,14 +436,16 @@ const initializeSignaler = (io) => {
             // cleanup the router if room not used
             if (Object.entries(filteredPeers).length === 0) {
                 rooms[disconnectingPeer.roomId].router.close();
-                delete rooms[disconnectingPeer.roomId].router;
-            }
-            // update room value
-            rooms[disconnectingPeer.roomId] = {
-                ...rooms[disconnectingPeer.roomId],
-                peers: filteredPeers
+                delete rooms[disconnectingPeer.roomId];
+            } else {
+                peers[disconnectingPeer.userId].producers[0].close();
+                rooms[disconnectingPeer.roomId] = {
+                    ...rooms[disconnectingPeer.roomId],
+                    peers: filteredPeers
+                }
             }
 
+            // delete room and global peer
             console.log(rooms[disconnectingPeer.roomId]);
             delete globalPeers[socket.id];
         })
