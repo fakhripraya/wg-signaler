@@ -1,10 +1,10 @@
-import express from 'express';
+import express from "express";
 import InitWebsocket from "./src/config/websocket.js";
-import dotenv from 'dotenv';
+import dotenv from "dotenv";
 import defaultRoute from "./src/routes/default.js";
 import voipRoute from "./src/routes/voip.js";
-import AppConfig from './src/config/index.js';
-import initializeSignaler from './src/signaler/index.js';
+import AppConfig from "./src/config/index.js";
+import initializeSignaler from "./src/signaler/index.js";
 
 // Init env
 dotenv.config();
@@ -28,9 +28,7 @@ initializeSignaler(io);
 // Server listen
 const port = process.env.PORT || 8000;
 server.listen(port, () => {
-    console.log(`Signaling Server is up and running on ${port} ...`);
+  console.log(
+    `Signaling Server is up and running on ${port} ...`
+  );
 });
-
-
-
-
