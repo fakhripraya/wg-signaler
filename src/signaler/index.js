@@ -219,6 +219,39 @@ const initializeSignaler = (io) => {
             }
         }
 
+        const doCleanUp = () =>{
+            // do some cleanup
+            // return if the socket does not exist in the room
+            const userLeave = globalPeers[socket.id];
+            if (!userLeave) return;
+
+            DEBUG && console.log(`SOCKET ${socket.id} - User leave the room with USER ID ${userLeave.userId}, from the ROOM ID: ${userLeave.roomId}`);
+            if (!rooms[userLeave.roomId]) return;
+            let peers = getAllPeers(userLeave.roomId);
+            if (!peers[userLeave.userId]) return;
+
+            // remove socket from room
+            const filteredPeers = Object.fromEntries(Object.entries(rooms[userLeave.roomId].peers).filter(([key]) => {
+                return key !== userLeave.userId
+            }));
+
+            // cleanup the router if room not used
+            if (Object.entries(filteredPeers).length === 0) {
+                rooms[userLeave.roomId].router.close();
+                delete rooms[userLeave.roomId];
+            } else {
+                peers[userLeave.userId].producers[0].close();
+                rooms[userLeave.roomId] = {
+                    ...rooms[userLeave.roomId],
+                    peers: filteredPeers
+                }
+            }
+
+            // delete room and global peer
+            DEBUG && console.log(rooms[userLeave.roomId]);
+            delete globalPeers[socket.id];
+        }
+
         // SOCKET EVENTS
         console.log(`SOCKET ${socket.id} - has been connected`);
         socket.emit('connection-success', {
@@ -416,42 +449,19 @@ const initializeSignaler = (io) => {
         })
 
         socket.on('consumer-resume', async ({ room, user, serverConsumerId }) => {
-            DEBUG && console.log(`SOCKET ${socket.id} - CONSUMER WITH ID : ${consumer.id} resume`);
+            DEBUG && console.log(`SOCKET ${socket.id} - CONSUMER WITH ID : ${serverConsumerId} resume`);
             const consumer = getConsumer(room.roomId, user.userId, serverConsumerId);
             await consumer.resume();
         })
 
+        socket.on('leave-room', (callback)=>{
+            doCleanUp();
+            callback();
+        })
+        
         socket.on('disconnect', () => {
-            // do some cleanup
-            // return if the socket does not exist in the room
-            const disconnectingPeer = globalPeers[socket.id];
-            if (!disconnectingPeer) return;
-
-            DEBUG && console.log(`SOCKET ${socket.id} - peer disconnected with USER ID ${disconnectingPeer.userId}, from the ROOM ID: ${disconnectingPeer.roomId}`);
-            if (!rooms[disconnectingPeer.roomId]) return;
-            let peers = getAllPeers(disconnectingPeer.roomId);
-            if (!peers[disconnectingPeer.userId]) return;
-
-            // remove socket from room
-            const filteredPeers = Object.fromEntries(Object.entries(rooms[disconnectingPeer.roomId].peers).filter(([key]) => {
-                return key !== disconnectingPeer.userId
-            }));
-
-            // cleanup the router if room not used
-            if (Object.entries(filteredPeers).length === 0) {
-                rooms[disconnectingPeer.roomId].router.close();
-                delete rooms[disconnectingPeer.roomId];
-            } else {
-                peers[disconnectingPeer.userId].producers[0].close();
-                rooms[disconnectingPeer.roomId] = {
-                    ...rooms[disconnectingPeer.roomId],
-                    peers: filteredPeers
-                }
-            }
-
-            // delete room and global peer
-            DEBUG && console.log(rooms[disconnectingPeer.roomId]);
-            delete globalPeers[socket.id];
+            DEBUG && console.log(`SOCKET ${socket.id} - peer disconnected`);
+            doCleanUp();
         })
     })
 }
