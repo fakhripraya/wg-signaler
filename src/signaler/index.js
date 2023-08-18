@@ -1,8 +1,12 @@
 import mediasoup from 'mediasoup';
 import { mediaCodecs, webRtcTransport_options } from '../variables/mediasoup.js';
-import { CONSUMER, PRODUCER, USER_ALREADY_JOIN } from '../variables/general.js';
+import { CONSUMER, DEV, PRODUCER, USER_ALREADY_JOIN } from '../variables/general.js';
 
 const initializeSignaler = (io) => {
+    
+    // DEBUG toggle
+    const DEBUG = process.env.APP_STATE === DEV;
+    
     /**
      * Worker
      * |-> Router(s)
@@ -67,10 +71,10 @@ const initializeSignaler = (io) => {
             if (rooms[room.roomId] && rooms[room.roomId].router) {
                 router = rooms[room.roomId].router;
                 peers = rooms[room.roomId].peers || [];
-                console.log(`SOCKET ${socket.id} - ROOM ID : ${room.roomId} exist, with ROUTER ID: ${router.id}`);
+                DEBUG && console.log(`SOCKET ${socket.id} - ROOM ID : ${room.roomId} exist, with ROUTER ID: ${router.id}`);
             } else {
                 router = await worker.createRouter({ mediaCodecs });
-                console.log(`SOCKET ${socket.id} - created ROUTER with ID: ${router.id}`, peers.length);
+                DEBUG && console.log(`SOCKET ${socket.id} - created ROUTER with ID: ${router.id}`, peers.length);
             }
 
             // declare error here
@@ -95,8 +99,8 @@ const initializeSignaler = (io) => {
                 }
             }
             else return error;
-            console.log(`SOCKET ${socket.id} - user joined the room with user Id: ${user.userId}`);
-
+            
+            DEBUG && console.log(`SOCKET ${socket.id} - user joined the room with user Id: ${user.userId}`);
             // Room info that hold the information of the current room the peer want to join 
             rooms[room.roomId] = {
                 storeId: storeId,
@@ -113,11 +117,11 @@ const initializeSignaler = (io) => {
                 try {
                     // create new transport 
                     let transport = await router.createWebRtcTransport(webRtcTransport_options);
-                    console.log(`SOCKET ${socket.id} - TRANSPORT created with id: ${transport.id}`);
+                    DEBUG && console.log(`SOCKET ${socket.id} - TRANSPORT created with id: ${transport.id}`);
 
                     // create the event listener for the transport
                     transport.on('dtlsstatechange', dtlsState => {
-                        console.log(`SOCKET ${socket.id} - DTLS STATE: ${dtlsState}`);
+                        DEBUG && console.log(`SOCKET ${socket.id} - DTLS STATE: ${dtlsState}`);
                         if (dtlsState === 'closed') transport.close();
                     });
 
@@ -139,8 +143,8 @@ const initializeSignaler = (io) => {
 
         const addTransport = ({ transport, roomId, userId, isConsumer }) => {
             // using memory reference to update the peers state
-            console.log(`SOCKET ${socket.id} - adding newly created transport to the user id: ${userId}, inside the room: ${roomId}`);
             let peers = getAllPeers(roomId);
+            DEBUG && console.log(`SOCKET ${socket.id} - adding newly created transport to the user id: ${userId}, inside the room: ${roomId}`);
             peers[userId] = {
                 ...peers[userId],
                 transports: [
@@ -169,8 +173,8 @@ const initializeSignaler = (io) => {
 
         const addProducer = (producer, roomId, userId) => {
             // using memory reference to update the peers state
-            console.log(`SOCKET ${socket.id} - adding newly created producer to the user id: ${userId}, inside the room: ${roomId}`);
             let peers = getAllPeers(roomId);
+            DEBUG && console.log(`SOCKET ${socket.id} - adding newly created producer to the user id: ${userId}, inside the room: ${roomId}`);
             peers[userId] = {
                 ...peers[userId],
                 producers: [
@@ -189,8 +193,8 @@ const initializeSignaler = (io) => {
 
         const addConsumer = (consumer, roomId, userId) => {
             // using memory reference to update the peers state
-            console.log(`SOCKET ${socket.id} - adding newly created consumer to the user id: ${userId}, inside the room: ${roomId}`);
             let peers = getAllPeers(roomId);
+            DEBUG && console.log(`SOCKET ${socket.id} - adding newly created consumer to the user id: ${userId}, inside the room: ${roomId}`);
             peers[userId] = {
                 ...peers[userId],
                 consumers: [
@@ -203,14 +207,14 @@ const initializeSignaler = (io) => {
         const informConsumers = (roomId, userId, producerId) => {
             // A new producer just joined
             // let all consumers to consume this producer
-            console.log(`SOCKET ${socket.id} - just joined, with PRODUCER ID ${producerId} and ROOM ID ${roomId}`);
             const peers = getAllPeers(roomId);
-            console.log(`SOCKET ${socket.id} - broadcaster peer USER ID: ${userId}`);
+            DEBUG && console.log(`SOCKET ${socket.id} - just joined, with PRODUCER ID ${producerId} and ROOM ID ${roomId}`);
+            DEBUG && console.log(`SOCKET ${socket.id} - broadcaster peer USER ID: ${userId}`);
             for (const [key, value] of Object.entries(peers)) {
                 if (key !== userId) {
-                    const producerSocket = value.socket;
-                    // use socket to send producer id to producer
-                    producerSocket.emit('new-producer', { producerId: producerId });
+                    const consumerSocket = value.socket;
+                    // use socket to send producer id to all consumers in the room
+                    consumerSocket.emit('new-producer', { producerId: producerId });
                 }
             }
         }
@@ -268,7 +272,7 @@ const initializeSignaler = (io) => {
 
         // see client's socket.emit('transport-connect', ...)
         socket.on('transport-connect', ({ dtlsParameters, room, user, producerTransportId }) => {
-            console.log(`SOCKET ${socket.id} - DTLS PARAMS: ${JSON.stringify(dtlsParameters)}`);
+            DEBUG && console.log(`SOCKET ${socket.id} - DTLS PARAMS: ${JSON.stringify(dtlsParameters)}`);
             getProducerTransport(room.roomId, user.userId, producerTransportId).connect({ dtlsParameters });
         })
 
@@ -292,7 +296,7 @@ const initializeSignaler = (io) => {
             });
 
             // add producer to the producers array
-            console.log(`SOCKET ${socket.id} - ADDING PRODUCER ID: ${producer.id}, KIND: ${producer.kind}`);
+            DEBUG && console.log(`SOCKET ${socket.id} - ADDING PRODUCER ID: ${producer.id}, KIND: ${producer.kind}`);
             addProducer(producer, room.roomId, user.userId);
             informConsumers(room.roomId, user.userId, producer.id);
 
@@ -314,7 +318,7 @@ const initializeSignaler = (io) => {
             // and return all producer transports
             let peers = getAllPeers(room.roomId);
             let producerList = [];
-            console.log(`SOCKET ${socket.id} - user with ID ${user.userId} requesting remote producers inside the room`);
+            DEBUG && console.log(`SOCKET ${socket.id} - user with ID ${user.userId} requesting remote producers inside the room`);
             for (const [key, value] of Object.entries(peers)) {
                 if (key === user.userId) continue;
                 console.log(`LOOPED USER: ${key}`);
@@ -335,7 +339,7 @@ const initializeSignaler = (io) => {
             room,
             user,
             serverConsumerTransportId }) => {
-            console.log(`DTLS PARAMS: ${JSON.stringify(dtlsParameters)}`)
+            DEBUG && console.log(`DTLS PARAMS: ${JSON.stringify(dtlsParameters)}`)
             const consumerTransport = getConsumerTransport(room.roomId, user.userId, serverConsumerTransportId);
             await consumerTransport.connect({ dtlsParameters })
         })
@@ -412,8 +416,8 @@ const initializeSignaler = (io) => {
         })
 
         socket.on('consumer-resume', async ({ room, user, serverConsumerId }) => {
+            DEBUG && console.log(`SOCKET ${socket.id} - CONSUMER WITH ID : ${consumer.id} resume`);
             const consumer = getConsumer(room.roomId, user.userId, serverConsumerId);
-            console.log(`SOCKET ${socket.id} - CONSUMER WITH ID : ${consumer.id} resume`);
             await consumer.resume();
         })
 
@@ -423,7 +427,7 @@ const initializeSignaler = (io) => {
             const disconnectingPeer = globalPeers[socket.id];
             if (!disconnectingPeer) return;
 
-            console.log(`SOCKET ${socket.id} - peer disconnected with USER ID ${disconnectingPeer.userId}, from the ROOM ID: ${disconnectingPeer.roomId}`);
+            DEBUG && console.log(`SOCKET ${socket.id} - peer disconnected with USER ID ${disconnectingPeer.userId}, from the ROOM ID: ${disconnectingPeer.roomId}`);
             if (!rooms[disconnectingPeer.roomId]) return;
             let peers = getAllPeers(disconnectingPeer.roomId);
             if (!peers[disconnectingPeer.userId]) return;
@@ -446,7 +450,7 @@ const initializeSignaler = (io) => {
             }
 
             // delete room and global peer
-            console.log(rooms[disconnectingPeer.roomId]);
+            DEBUG && console.log(rooms[disconnectingPeer.roomId]);
             delete globalPeers[socket.id];
         })
     })
