@@ -118,8 +118,13 @@ const initializeSignaler = (io) => {
       for (const [key, value] of Object.entries(
         globalPeers
       )) {
-        if (value.userId === user.userId) return error;
+        if (value.userId === user.userId)
+          return {
+            ...error,
+            joinedRoomId: value.roomId,
+          };
       }
+
       if (!(user.userId in peers)) {
         peers[user.userId] = peer;
         globalPeers[socket.id] = {
@@ -128,7 +133,7 @@ const initializeSignaler = (io) => {
           roomId: room.roomId,
           storeId: storeId,
         };
-      } else return error;
+      }
 
       DEBUG &&
         console.log(
@@ -408,7 +413,6 @@ const initializeSignaler = (io) => {
 
     // signal with brodcast, assigned when peer join the store
     socket.on("signal-channels-data", ({ storeId }) => {
-      console.log("masuk signal nich");
       if (Object.entries(rooms).length === 0) return;
       const reduced = getAllPeersInSpecificStore(
         rooms,
@@ -424,12 +428,13 @@ const initializeSignaler = (io) => {
       async (joinDetails, callback) => {
         // create Router if it does not exist
         // const router1 = rooms[roomName] && rooms[roomName].get('data').router || await createRoom(roomName, socket.id)
-        const { router, error } = await createOrJoinRoom(
-          joinDetails,
-          socket
-        );
+        const { router, error, joinedRoomId } =
+          await createOrJoinRoom(joinDetails, socket);
         if (error)
-          return socket.emit("user-already-joined");
+          return socket.emit("user-already-joined", {
+            JoinedRoomId: joinedRoomId,
+            wantToJoinRoomId: joinDetails.room.roomId,
+          });
 
         // get Router RTP Capabilities
         const rtpCapabilities = router.rtpCapabilities;
