@@ -55,6 +55,18 @@ const initializeSignaler = (io) => {
   // And then we add the socket listeners
   worker = createWorker();
   io.on("connection", async (socket) => {
+    // INITIALIZE AFTER CONNECTION ESTABLISHED
+    (function () {
+      DEBUG &&
+        console.log(
+          `SOCKET ${socket.id} - has been connected`
+        );
+      socket.emit("connection-success", (storeId) => {
+        // join the store id "socket room" to ease the signaling of the store scope
+        socket.join(storeId);
+      });
+    })();
+
     // SOCKET FUNCTIONS
     const createOrJoinRoom = async (
       { storeId, room, user },
@@ -264,6 +276,8 @@ const initializeSignaler = (io) => {
       };
     };
 
+    // this function only purpose to transfer remote producer track
+    // not intended to render UI since its scope only in room level
     const informConsumers = (
       roomId,
       userId,
@@ -291,46 +305,6 @@ const initializeSignaler = (io) => {
       }
     };
 
-    const doCleanUp = () => {
-      // do some cleanup
-      // return if the socket does not exist in the room
-      const userLeave = globalPeers[socket.id];
-      if (!userLeave) return;
-
-      DEBUG &&
-        console.log(
-          `SOCKET ${socket.id} - User leave the room with USER ID ${userLeave.userId}, from the ROOM ID: ${userLeave.roomId}`
-        );
-      if (!rooms[userLeave.roomId]) return;
-      let peers = getAllPeers(userLeave.roomId);
-      if (!peers[userLeave.userId]) return;
-
-      // remove socket from room
-      const filteredPeers = Object.fromEntries(
-        Object.entries(
-          rooms[userLeave.roomId].peers
-        ).filter(([key]) => {
-          return key !== userLeave.userId;
-        })
-      );
-
-      // cleanup the router if room not used
-      if (Object.entries(filteredPeers).length === 0) {
-        rooms[userLeave.roomId].router.close();
-        delete rooms[userLeave.roomId];
-      } else {
-        peers[userLeave.userId].producers[0].close();
-        rooms[userLeave.roomId] = {
-          ...rooms[userLeave.roomId],
-          peers: filteredPeers,
-        };
-      }
-
-      // delete room and global peer
-      DEBUG && console.log(rooms[userLeave.roomId]);
-      delete globalPeers[socket.id];
-    };
-
     const getAllPeersInSpecificStore = (obj, storeId) => {
       return Object.entries(obj).reduce(
         (acc, [key, val]) => {
@@ -356,20 +330,74 @@ const initializeSignaler = (io) => {
       );
     };
 
-    // SOCKET EVENTS
-    DEBUG &&
-      console.log(
-        `SOCKET ${socket.id} - has been connected`
-      );
-    socket.emit("connection-success", {
-      socketId: socket.id,
-    });
+    const doCleanUp = () => {
+      // do some cleanup
+      // return if the socket does not exist in the room
+      const userLeave = globalPeers[socket.id];
+      if (!userLeave) return;
 
+      DEBUG &&
+        console.log(
+          `SOCKET ${socket.id} - User leave the room with USER ID ${userLeave.userId}, from the ROOM ID: ${userLeave.roomId}`
+        );
+      const storeId = globalPeers[socket.id].storeId;
+      if (!rooms[userLeave.roomId]) return;
+      let peers = getAllPeers(userLeave.roomId);
+      if (!peers[userLeave.userId]) return;
+
+      // remove socket from room
+      const filteredPeers = Object.fromEntries(
+        Object.entries(
+          rooms[userLeave.roomId].peers
+        ).filter(([key]) => {
+          return key !== userLeave.userId;
+        })
+      );
+
+      // try to cleanup the leaving peer info from the target room
+      try {
+        if (Object.entries(filteredPeers).length === 0) {
+          rooms[userLeave.roomId].router.close();
+          delete rooms[userLeave.roomId];
+        } else {
+          peers[userLeave.userId].producers[0].close();
+          rooms[userLeave.roomId] = {
+            ...rooms[userLeave.roomId],
+            peers: filteredPeers,
+          };
+        }
+
+        // delete room and global peer
+        DEBUG && console.log(rooms[userLeave.roomId]);
+        delete globalPeers[socket.id];
+
+        // cleanup the router if room not used
+        let reduced;
+        if (Object.entries(rooms).length === 0)
+          reduced = {};
+        else
+          reduced = getAllPeersInSpecificStore(
+            rooms,
+            storeId
+          );
+
+        // emit updated room condition to the peer in the store
+        socket
+          .to(storeId)
+          .emit("receive-channels-data", reduced);
+      } catch (err) {
+        console.error(
+          `SOCKET ${socket.id} - error when emitting the "recieve-channels-data", error: ${err}`
+        );
+      }
+    };
+
+    // SOCKET EVENTS
     socket.on(
-      "get-render-data",
+      "get-channels-data",
       ({ storeId }, callback) => {
         if (Object.entries(rooms).length === 0)
-          callback({});
+          return callback({});
         const reduced = getAllPeersInSpecificStore(
           rooms,
           storeId
@@ -377,6 +405,19 @@ const initializeSignaler = (io) => {
         callback(reduced);
       }
     );
+
+    // signal with brodcast, assigned when peer join the store
+    socket.on("signal-channels-data", ({ storeId }) => {
+      console.log("masuk signal nich");
+      if (Object.entries(rooms).length === 0) return;
+      const reduced = getAllPeersInSpecificStore(
+        rooms,
+        storeId
+      );
+      socket
+        .to(storeId)
+        .emit("receive-channels-data", reduced);
+    });
 
     socket.on(
       "join-room",
