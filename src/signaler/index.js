@@ -6,13 +6,17 @@ import {
 import {
   CONSUMER,
   DEV,
+  PREPROD,
   PRODUCER,
   USER_ALREADY_JOIN,
 } from "../variables/general.js";
 
 const initializeSignaler = (io) => {
   // DEBUG toggle
-  const DEBUG = process.env.APP_STATE === DEV;
+  const DEBUG = process.env.APP_STATE === DEV || PREPROD;
+
+  console.log(process.env.APP_RTC_MIN_PORT);
+  console.log(process.env.APP_RTC_MAX_PORT);
 
   /**
    * Worker
