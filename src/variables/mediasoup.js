@@ -24,7 +24,7 @@ export const webRtcTransport_options = {
   listenIps: [
     {
       ip: "0.0.0.0",
-      announcedIp: process.env.APP_ORIGIN,
+      announcedIp: process.env.APP_ANNOUNCED_IP,
     },
   ],
   enableUdp: true,
