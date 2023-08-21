@@ -157,11 +157,10 @@ const initializeSignaler = (io) => {
     const createWebRtcTransport = async (router) => {
       return new Promise(async (resolve, reject) => {
         try {
+          const options = webRtcTransport_options();
           // create new transport
           let transport =
-            await router.createWebRtcTransport(
-              webRtcTransport_options
-            );
+            await router.createWebRtcTransport(options);
           DEBUG &&
             console.log(
               `SOCKET ${socket.id} - TRANSPORT created with id: ${transport.id}`
