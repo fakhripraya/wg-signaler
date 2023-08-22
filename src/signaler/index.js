@@ -14,10 +14,6 @@ import {
 const initializeSignaler = (io) => {
   // DEBUG toggle
   const DEBUG = process.env.APP_STATE === DEV || PREPROD;
-
-  console.log(process.env.APP_RTC_MIN_PORT);
-  console.log(process.env.APP_RTC_MAX_PORT);
-
   /**
    * Worker
    * |-> Router(s)
@@ -36,6 +32,22 @@ const initializeSignaler = (io) => {
     // SO WHEN THE MAX PORT REACH THERE IS STILL MORE WORKER THAT CAN PROCESS
     // Create worker to handle the webRTC background process
     worker = await mediasoup.createWorker({
+      logLevel: DEBUG && "debug",
+      logTags: DEBUG && [
+        "ice",
+        "dtls",
+        "rtp",
+        "srtp",
+        "rtcp",
+        "rtx",
+        "bwe",
+        "score",
+        "simulcast",
+        "svc",
+        "sctp",
+        "message",
+        "info",
+      ],
       rtcMinPort: process.env.APP_RTC_MIN_PORT,
       rtcMaxPort: process.env.APP_RTC_MAX_PORT,
     });
