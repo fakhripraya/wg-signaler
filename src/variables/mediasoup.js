@@ -21,8 +21,7 @@ export const mediaCodecs = [
 ];
 
 // https://mediasoup.org/documentation/v3/mediasoup/api/#WebRtcTransportOptions
-export const webRtcTransport_options = () => {
-  const HOST_PUBLIC_IP = process.env.APP_ANNOUNCED_IP;
+export const webRtcTransport_options = (HOST_PUBLIC_IP) => {
   return {
     listenIps: [
       {

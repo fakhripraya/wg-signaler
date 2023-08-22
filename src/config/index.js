@@ -9,6 +9,8 @@ import fs from "fs";
 import pluralize from "pluralize";
 
 const AppConfig = (app, express) => {
+  // env
+  const APP_STATE = process.env.APP_STATE;
   // Express app config
   app.locals.pluralize = pluralize;
   app.use(logger("dev"));
@@ -40,7 +42,7 @@ const AppConfig = (app, express) => {
     key: fs.readFileSync("./ssl/key.pem", "utf-8"),
     cert: fs.readFileSync("./ssl/cert.pem", "utf-8"),
   };
-  if (process.env.APP_STATE === DEV)
+  if (APP_STATE === DEV)
     server = https.createServer(options, app);
   return { server, app };
 };

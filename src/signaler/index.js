@@ -12,8 +12,12 @@ import {
 } from "../variables/general.js";
 
 const initializeSignaler = (io) => {
+  // ENV
   // DEBUG toggle
   const DEBUG = process.env.APP_STATE === DEV || PREPROD;
+  const APP_RTC_MIN_PORT = process.env.APP_RTC_MIN_PORT;
+  const APP_RTC_MAX_PORT = process.env.APP_RTC_MAX_PORT;
+  const HOST_PUBLIC_IP = process.env.APP_ANNOUNCED_IP;
   /**
    * Worker
    * |-> Router(s)
@@ -48,8 +52,8 @@ const initializeSignaler = (io) => {
         "message",
         "info",
       ],
-      rtcMinPort: process.env.APP_RTC_MIN_PORT,
-      rtcMaxPort: process.env.APP_RTC_MAX_PORT,
+      rtcMinPort: APP_RTC_MIN_PORT,
+      rtcMaxPort: APP_RTC_MAX_PORT,
     });
     console.log(`created WORKER with pid ${worker.pid}`);
 
@@ -169,7 +173,8 @@ const initializeSignaler = (io) => {
     const createWebRtcTransport = async (router) => {
       return new Promise(async (resolve, reject) => {
         try {
-          const options = webRtcTransport_options();
+          const options =
+            webRtcTransport_options(HOST_PUBLIC_IP);
           // create new transport
           let transport =
             await router.createWebRtcTransport(options);
