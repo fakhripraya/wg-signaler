@@ -38,12 +38,13 @@ const AppConfig = (app, express) => {
   // SSL cert for HTTPS access
   // (this is for test purposes and will not be used on production app)
   let server = http.createServer(app);
-  const options = {
-    key: fs.readFileSync("./ssl/key.pem", "utf-8"),
-    cert: fs.readFileSync("./ssl/cert.pem", "utf-8"),
-  };
-  if (APP_STATE === DEV)
+  if (APP_STATE === DEV) {
+    const options = {
+      key: fs.readFileSync("./ssl/key.pem", "utf-8"),
+      cert: fs.readFileSync("./ssl/cert.pem", "utf-8"),
+    };
     server = https.createServer(options, app);
+  }
   return { server, app };
 };
 
