@@ -111,6 +111,25 @@ const initializeSignaler = (io) => {
         },
       };
 
+      // peer used user id to uniquely identified the peer by user reference
+      // it is to prevent double join on different device
+      // check double join on different device
+      // cleanup the old record of double join and proceed
+      for (const [key, value] of Object.entries(
+        globalPeers
+      )) {
+        if (value.userId === user.userId) {
+          DEBUG &&
+            console.log(
+              `SOCKET ${key} - there is an existing socket with ID : ${key}, doing some cleanup for the old record...`
+            );
+          await socket.to(key).emit("user-already-joined", {
+            JoinedRoom: rooms[value.roomId].details,
+          });
+        }
+      }
+
+      // get the existing room or do some room creation
       if (rooms[room.roomId] && rooms[room.roomId].router) {
         router = rooms[room.roomId].router;
         peers = rooms[room.roomId].peers || [];
@@ -125,24 +144,6 @@ const initializeSignaler = (io) => {
             `SOCKET ${socket.id} - created ROUTER with ID: ${router.id}`,
             peers.length
           );
-      }
-
-      // declare error here
-      const error = {
-        router: null,
-        error: `SOCKET ${socket.id} - error joining room: ${USER_ALREADY_JOIN}`,
-      };
-      // peer used user id to uniquely identified the peer by user reference
-      // it is to prevent double join on different device
-      // check double join on different device
-      for (const [key, value] of Object.entries(
-        globalPeers
-      )) {
-        if (value.userId === user.userId)
-          return {
-            ...error,
-            joinedRoomId: value.roomId,
-          };
       }
 
       if (!(user.userId in peers)) {
@@ -167,7 +168,7 @@ const initializeSignaler = (io) => {
         peers: peers,
       };
 
-      return { router: router, error: null };
+      return router;
     };
 
     const createWebRtcTransport = async (router) => {
@@ -358,14 +359,14 @@ const initializeSignaler = (io) => {
     const doCleanUp = () => {
       // do some cleanup
       // return if the socket does not exist in the room
-      const userLeave = globalPeers[socket.id];
+      let userLeave = globalPeers[socket.id];
       if (!userLeave) return;
 
       DEBUG &&
         console.log(
           `SOCKET ${socket.id} - User leave the room with USER ID ${userLeave.userId}, from the ROOM ID: ${userLeave.roomId}`
         );
-      const storeId = globalPeers[socket.id].storeId;
+      const storeId = userLeave.storeId;
       if (!rooms[userLeave.roomId]) return;
       let peers = getAllPeers(userLeave.roomId);
       if (!peers[userLeave.userId]) return;
@@ -394,7 +395,7 @@ const initializeSignaler = (io) => {
 
         // delete room and global peer
         DEBUG && console.log(rooms[userLeave.roomId]);
-        delete globalPeers[socket.id];
+        delete globalPeers[userLeave.socketId];
 
         // cleanup the router if room not used
         let reduced;
@@ -448,13 +449,10 @@ const initializeSignaler = (io) => {
       async (joinDetails, callback) => {
         // create Router if it does not exist
         // const router1 = rooms[roomName] && rooms[roomName].get('data').router || await createRoom(roomName, socket.id)
-        const { router, error, joinedRoomId } =
-          await createOrJoinRoom(joinDetails, socket);
-        if (error)
-          return socket.emit("user-already-joined", {
-            JoinedRoomId: joinedRoomId,
-            wantToJoinRoomId: joinDetails.room.roomId,
-          });
+        const router = await createOrJoinRoom(
+          joinDetails,
+          socket
+        );
 
         // get Router RTP Capabilities
         const rtpCapabilities = router.rtpCapabilities;

@@ -1,9 +1,10 @@
 import socket from "socket.io";
+import CORSConfiguration from "./connection.js";
 
 function InitWebsocket(server) {
   const io = socket(server, {
     cors: {
-      origin: "*",
+      origin: CORSConfiguration(),
       methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
       allowedHeaders: ["user-agent"],
       credentials: true,
