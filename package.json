@@ -1,7 +1,7 @@
 {
   "name": "wg-signaler",
   "version": "0.2.1",
-  "description": "Signaler service for LiveJB client",
+  "description": "WebRTC signaler service for the server side",
   "main": "index.js",
   "type": "module",
   "dependencies": {
