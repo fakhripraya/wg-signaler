@@ -10,7 +10,7 @@ import initializeSignaler from "./src/signaler/index.js";
 dotenv.config();
 
 // Initialize express app object
-var expressApp = express();
+const expressApp = express();
 
 // Init App configurations
 const { server, app } = AppConfig(expressApp, express);
